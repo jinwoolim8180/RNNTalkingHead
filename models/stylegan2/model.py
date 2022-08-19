@@ -469,3 +469,62 @@ class Generator(nn.Module):
                 return image, styles, noise
             else:
                 return image, rand_in, rand_rec
+
+
+class Encoder(nn.Module):
+    def __init__(self,
+                 size,
+                 channel_multiplier=2):
+        super().__init__()
+        self.size = size
+
+        self.channels = {
+            4: 512,
+            8: 512,
+            16: 512,
+            32: 512,
+            64: 256 * channel_multiplier,
+            128: 128 * channel_multiplier,
+            256: 64 * channel_multiplier,
+            512: 32 * channel_multiplier,
+            1024: 16 * channel_multiplier,
+        }
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(self.channels[4], self.channels[4], kernel_size=3, padding=1),
+            nn.InstanceNorm2d(self.channels[4]),
+            FusedLeakyReLU(self.channels[4])
+        )
+
+        self.log_size = int(math.log(size, 2))
+        self.num_layers = (self.log_size - 2) * 2 + 1
+
+        self.convs = nn.ModuleList()
+        in_channel = self.channels[4]
+
+        for i in range(self.log_size + 1, -1, 2):
+            out_channel = self.channels[2**i]
+
+            self.convs.append(nn.Sequential(
+                nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=2),
+                nn.InstanceNorm2d(self.channels[4]),
+                FusedLeakyReLU(out_channel)
+            ))
+
+            self.convs.append(nn.Sequential(
+                nn.Conv2d(out_channel, out_channel, kernel_size=3, padding=1),
+                nn.InstanceNorm2d(self.channels[4]),
+                FusedLeakyReLU(out_channel)
+            ))
+
+            in_channel = out_channel
+
+        self.n_latent = self.log_size * 2 - 2
+
+    def forward(self, image):
+        out = self.conv1(image)
+        for conv1, conv2 in zip(
+                self.convs[::2], self.convs[1::2]):
+            out = conv1(out)
+            out = conv2(out)
+
+        return out

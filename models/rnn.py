@@ -14,6 +14,19 @@ from torch.nn import init
 import torch.optim as optim
 
 
+class ShallowCNN(nn.Module):
+    def __init__(self,
+                 out_channels,
+                 n_layers):
+        super(ShallowCNN, self).__init__()
+        self.convs = nn.ModuleList()
+        for i in range(n_layers):
+
+
+    def forward(self, image):
+        return image
+
+
 class RNNModule(nn.Module):
     def __init__(self,
                  pca_comp_path,
